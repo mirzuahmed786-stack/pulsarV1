@@ -1,0 +1,113 @@
+groups:
+  - name: elementa-rpc-abuse
+    interval: 30s
+    rules:
+      - alert: ElementaRpcMethodRateLimitSpikeSingle
+        expr: increase(elementa_rpc_method_rate_limited_single_total[5m]) >= 20
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "RPC single-request method rate limiting spike"
+          description: "Single JSON-RPC method throttling exceeded 20 events in 5m. Investigate abusive clients or incorrect client retry behavior."
+
+      - alert: ElementaRpcMethodRateLimitSpikeBatch
+        expr: increase(elementa_rpc_method_rate_limited_batch_total[5m]) >= 10
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "RPC batch-item method rate limiting spike"
+          description: "Batch JSON-RPC item throttling exceeded 10 events in 5m. Investigate scripted abuse or batch amplification attacks."
+
+      - alert: ElementaRpcMethodRateLimitCritical
+        expr: increase(elementa_rpc_method_rate_limited_single_total[5m]) + increase(elementa_rpc_method_rate_limited_batch_total[5m]) >= 100
+        for: 1m
+        labels:
+          severity: critical
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Critical RPC abuse spike"
+          description: "Combined RPC method-rate-limit events exceeded 100 in 5m. Escalate incident response and consider temporary edge controls."
+
+      - alert: ElementaApiRejectReasonInvalidQuerySpike
+        expr: increase(elementa_api_reject_reason_total{reason="invalid_query"}[5m]) >= 40
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Invalid-query rejection spike"
+          description: "Invalid query rejections exceeded 40 in 5m. Investigate client regression or probing activity."
+
+      - alert: ElementaApiRejectReasonBlockedRpcUrlSpike
+        expr: increase(elementa_api_reject_reason_total{reason="blocked_rpc_url"}[5m]) >= 15
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Blocked RPC URL rejection spike"
+          description: "Blocked rpcUrl rejections exceeded 15 in 5m. Investigate SSRF attempts or hostile RPC endpoint injection."
+
+      - alert: ElementaApiRejectReasonPayloadAbuseSpike
+        expr: increase(elementa_api_reject_reason_total{reason=~"rpc_payload_too_large|rpc_batch_too_large|invalid_jsonrpc_payload|invalid_jsonrpc_request"}[5m]) >= 30
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "RPC payload abuse rejection spike"
+          description: "Payload-shape/size rejections exceeded 30 in 5m. Investigate malformed JSON-RPC flood or payload amplification attempts."
+
+      - alert: ElementaApiRejectReasonCritical
+        expr: increase(elementa_api_reject_reason_total[5m]) >= 150
+        for: 1m
+        labels:
+          severity: critical
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Critical API rejection spike"
+          description: "Aggregate API reject reasons exceeded 150 in 5m. Trigger incident response and temporary perimeter controls."
+
+      - alert: ElementaCloudBlobWriteRateLimitSpike
+        expr: increase(elementa_api_reject_reason_total{reason="cloud_blob_write_rate_limited"}[5m]) >= 15
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Cloud blob write throttle spike"
+          description: "Cloud recovery blob write-rate limit exceeded 15 events in 5m. Investigate abusive restore/upload attempts."
+
+      - alert: ElementaCloudBlobReadRateLimitSpike
+        expr: increase(elementa_api_reject_reason_total{reason="cloud_blob_read_rate_limited"}[5m]) >= 30
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Cloud blob read throttle spike"
+          description: "Cloud recovery blob read-rate limit exceeded 30 events in 5m. Investigate account probing or scripted extraction attempts."
+
+      - alert: ElementaCloudBlobValidationFailuresSpike
+        expr: increase(elementa_api_reject_reason_total{reason="cloud_blob_validation_failed"}[5m]) >= 25
+        for: 2m
+        labels:
+          severity: warning
+          service: elementa-backend
+          category: abuse
+        annotations:
+          summary: "Cloud blob validation failure spike"
+          description: "Cloud recovery blob validation failures exceeded 25 events in 5m. Investigate malformed payload abuse or client-side regressions."

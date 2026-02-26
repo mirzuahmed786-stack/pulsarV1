@@ -1,0 +1,41 @@
+{
+  "google:wallet-user-1": {
+    "createdAt": 1710000000000,
+    "encryptedSeedBlob": "AAECAwQFBgcICQoLDA0ODxAREhM=",
+    "hdIndex": 0,
+    "kekKdf": null,
+    "secretType": "mnemonic",
+    "updatedAt": 1771443516341,
+    "version": 1,
+    "walletId": "wallet-rl-test"
+  },
+  "google:107290981861888193704": {
+    "createdAt": 1770756287375,
+    "encryptedSeedBlob": "1a4c9bda1f3f585986a010ee48d7e81de4d6d5560b09c259205dbeb6697bf33e5a25cdbab63dc1ddf4e086afd611c4de5d1573238905b307ad697886c75ec6900c5190883e6eade33e1ca7642aabe77ccc924555423d00ed818e0b51c3d3af6bf685dcf9586e3e923d9c753fa455bbac",
+    "hdIndex": 0,
+    "secretType": "mnemonic",
+    "updatedAt": 1770756287382,
+    "version": 1,
+    "walletId": "0x7c121e4fb2d7c3787517317cbb9ae8271944129a"
+  },
+  "google:117052420744403067846": {
+    "createdAt": 1771961521734,
+    "encryptedSeedBlob": "23239b9dc2058cdd6b61931b2ae57ea215ad2ee79c56415d5276e188bcfcdc36105b23b635d47b1ec62ce73789c8d01e91e154768de1e7d3c3a519970a7921f29a264a6504ecb035273624a8b43df48b989fb0b78e2ab3bc5969726d0da1e252bac55791f1b3f4434bec7a7a6b11eacb016d771b71cd0c60cf",
+    "hdIndex": 0,
+    "kekKdf": null,
+    "secretType": "mnemonic",
+    "updatedAt": 1771961521749,
+    "version": 1,
+    "walletId": "0x86b0288a86a96bfdf15bddd327a9a095e8f99531"
+  },
+  "google:116740631696577132176": {
+    "createdAt": 1770909651768,
+    "encryptedSeedBlob": "12d4de27ba9e6d0018493472b57f183cf60abbce63ebd47cd848c9dc34e8d7c31011a9ede869711939348b9477673a2dd20e44245e5f160bf3bdac8bebea112aebedc1b3fe0fa717a568cbdfa6d92e1be414ca73eb697d6430708337c571343a4a0c4f04480c6223cdfbafaf45ebddc23cad45836fc3",
+    "hdIndex": 0,
+    "kekKdf": null,
+    "secretType": "mnemonic",
+    "updatedAt": 1770909651778,
+    "version": 1,
+    "walletId": "0x3a15ddddf3017fd44d6cc3dbc1b2cd4200ea2f5b"
+  }
+}

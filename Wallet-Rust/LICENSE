@@ -1,0 +1,32 @@
+# Elementa Wallet License
+
+## Proprietary License Agreement
+
+Copyright © 2025 Elementa Protocol. All rights reserved.
+
+This software and associated documentation files (the "Software") is the proprietary and confidential information of Elementa Protocol. 
+
+### Restrictions
+
+You may NOT:
+- Copy, modify, or distribute the Software
+- Reverse engineer or decompile the Software
+- Use the Software for competitive purposes
+- Remove or alter any proprietary notices
+
+### Permitted Uses
+
+Permitted uses require explicit written permission from Elementa Protocol.
+
+### Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED.
+
+For licensing inquiries, contact: [contact information]
+
+---
+
+For open-source components and their respective licenses, see individual package.json files in:
+- `frontend/package.json` - Frontend dependencies
+- `backend/Cargo.toml` - Rust backend dependencies
+- `core-rust/Cargo.toml` - Rust dependencies

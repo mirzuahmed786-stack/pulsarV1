@@ -1,0 +1,33 @@
+[package]
+name = "earth_solana_tooling"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+
+solana-client = "2.3.13"
+solana-rpc-client = "2.3.13"
+solana-commitment-config = "2.2.1"
+solana-pubkey = { version = "2.4.0", default-features = false }
+solana-keypair = "2.2.1"
+solana-signature = { version = "2.3.0", default-features = false }
+solana-signer = "2.2.1"
+solana-transaction = "2.2.3"
+solana-message = "2.4.0"
+solana-hash = { version = "2.3.0", default-features = false }
+solana-instruction = { version = "2.3.0", default-features = false }
+
+spl-token = "6"
+spl-associated-token-account = "4"
+bincode = "1"
+
+borsh = "1"
+sha2 = "0.10"
+
+
+[lib]
+path = "src/lib.rs"

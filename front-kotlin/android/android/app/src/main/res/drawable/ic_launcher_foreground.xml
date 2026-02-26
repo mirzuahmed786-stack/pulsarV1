@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Exact replica of the PULSAR logo icon -->
+    <group
+        android:translateX="54"
+        android:translateY="54">
+        <!-- Center circle (dark) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M0,0m-12,0a12,12 0,1,1 24,0a12,12 0,1,1 -24,0"/>
+        <!-- Top ray (vertical rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-3,-17L3,-17L3,-28L-3,-28Z"/>
+        <!-- Bottom ray (vertical rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-3,17L3,17L3,28L-3,28Z"/>
+        <!-- Right ray (horizontal rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M17,-3L17,3L28,3L28,-3Z"/>
+        <!-- Left ray (horizontal rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-17,-3L-17,3L-28,3L-28,-3Z"/>
+        <!-- Top-right diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M12.73,-12.73L16.97,-16.97L24.04,-9.9L19.8,-5.66Z"/>
+        <!-- Top-left diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-12.73,-12.73L-16.97,-16.97L-24.04,-9.9L-19.8,-5.66Z"/>
+        <!-- Bottom-right diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M12.73,12.73L16.97,16.97L24.04,9.9L19.8,5.66Z"/>
+        <!-- Bottom-left diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-12.73,12.73L-16.97,16.97L-24.04,9.9L-19.8,5.66Z"/>
+    </group>
+</vector>

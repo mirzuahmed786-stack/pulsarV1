@@ -1,0 +1,19 @@
+{
+  "programId": "DHnQfvfUy7Yt92BxZxpj1G8UMWXyKyGGYHvUn2Lrb1xK",
+  "pool": "Bv2iqnDkvcrRzXJQJRQtg7EDe1TR8tL1X7GrRzyE2C6G",
+  "feeBps": 30,
+  "tokenA": {
+    "mint": "FGahtsaiERiPJ8KrSejkt2xdwCzpJ6BEEKwLoiByGgun",
+    "symbol": "TSTA",
+    "decimals": 6
+  },
+  "tokenB": {
+    "mint": "BRncLKqYfdgxtr2V4L7u2GWKUnPa7Hhjn6Y5pGsgj7x5",
+    "symbol": "TSTB",
+    "decimals": 6
+  },
+  "vaultA": "3ZaLvkkLXk8iAoKfyAuWAoB4SFuBbE4G1py3sdhQcdvA",
+  "vaultB": "GNQ2gjidAqADxAUkSi33kFwtwGUiHfg1NCs6Uyn5KSnm",
+  "lpMint": "GewiMu62Mz15BNhvonPVHhc6yUGYXKSyjLNyunzypLfS",
+  "rpcUrl": "https://api.testnet.solana.com"
+}

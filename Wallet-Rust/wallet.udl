@@ -1,0 +1,248 @@
+// hassam dev: UniFFI Interface Definition Language (UDL) for Kotlin/JVM bridge (Phase 1)
+// This file defines all public functions and types that will be exposed to Kotlin
+// The uniffi-bindgen tool will use this to auto-generate Kotlin wrappers
+
+namespace wallet {
+
+    // ========================================
+    // ERRORS - Structured error handling for Kotlin exception model
+    // ========================================
+    [Error]
+    enum VaultError {
+        "InvalidMnemonic",
+        "InvalidPin",
+        "InvalidDerivationPath",
+        "CryptoError",
+        "InvalidKeyMaterial",
+        "SerializationError",
+        "RecoveryBackupMismatch",
+        "UnknownError",
+    };
+
+    // ========================================
+    // DATA TYPES - Core structures passed between Kotlin and Rust
+    // ========================================
+
+    // KDF Parameters: Used in VaultRecord for key derivation configuration
+    dictionary KdfParams {
+        string name;                    // Algorithm name: "argon2id"
+        bytes salt;                     // KDF salt for key derivation
+        u32 memory_kib;                 // Memory cost in KiB
+        u32 iterations;                 // Time cost: number of iterations
+        u32 parallelism;                // Parallelism factor
+    };
+
+    // Cipher Blob: Encrypted secret storage structure
+    dictionary CipherBlob {
+        bytes nonce;                    // Encryption nonce (24 bytes for XChaCha20)
+        bytes ciphertext;               // Encrypted payload
+    };
+
+    // Main Vault Record: Complete encrypted wallet structure
+    dictionary VaultRecord {
+        u32 version;                    // Structure version
+        KdfParams kdf;                  // Key derivation parameters
+        CipherBlob cipher;              // Encrypted secret blob
+        string public_address;          // EVM address (primary wallet ID)
+        u32? hd_index;                  // Optional HD derivation index
+        boolean? is_hd;                 // Optional flag: mnemonic vs raw key
+    };
+
+    // Access List Item: EIP-2930 access list entry for EVM transactions
+    dictionary AccessListItem {
+        string address;                 // Contract address
+        sequence<string> storage_keys;  // Storage keys
+    };
+
+    // Legacy EVM Transaction: Pre-EIP1559 transaction format
+    dictionary UnsignedLegacyTx {
+        u64 nonce;                      // Transaction nonce
+        string gas_price;               // Wei as string (big integer)
+        u64 gas_limit;                  // Gas limit
+        string to;                      // Recipient address (0x-prefixed)
+        string value;                   // Wei as string (big integer)
+        string data;                    // Hex-encoded call data
+        u64 chain_id;                   // EVM chain ID
+    };
+
+    // EIP-1559 Transaction: Dynamic fee transaction format (EVM)
+    dictionary UnsignedEip1559Tx {
+        u64 chain_id;                   // EVM chain ID
+        u64 nonce;                      // Transaction nonce
+        string max_priority_fee_per_gas;// Priority fee in Wei (string)
+        string max_fee_per_gas;         // Maximum fee in Wei (string)
+        u64 gas_limit;                  // Gas limit
+        string to;                      // Recipient address
+        string value;                   // Wei as string
+        string data;                    // Hex-encoded call data
+        sequence<AccessListItem> access_list;  // Optional access list
+    };
+
+    // Recovery Backup: Encrypted backup of vault for disaster recovery
+    dictionary RecoveryBackup {
+        u32 version;                    // Structure version
+        KdfParams kdf;                  // Key derivation parameters
+        CipherBlob cipher;              // Encrypted secret blob
+        string wallet_id;               // ETH address at index 0 (stable ID)
+        u64 created_at;                 // Creation timestamp
+        string secret_type;             // "mnemonic" or "raw32"
+        u32 hd_index;                   // Active account index at creation
+    };
+
+    // Cloud Recovery Blob: Cloud-safe encrypted seed backup
+    dictionary CloudRecoveryBlob {
+        u32 version;                    // Structure version
+        string wallet_id;               // ETH address at index 0
+        u64 created_at;                 // Creation timestamp
+        string secret_type;             // "mnemonic" or "raw32"
+        u32 hd_index;                   // Active account index
+        string encrypted_seed_blob;     // Hex: nonce (24 bytes) + ciphertext
+    };
+
+    // Multi-chain addresses from a single mnemonic
+    dictionary MultichainAddresses {
+        string eth;                     // Ethereum address
+        string btc;                     // Bitcoin address  
+        string sol;                     // Solana address
+    };
+
+    // Web3Auth integration result
+    dictionary Web3AuthWalletResult {
+        VaultRecord vault;              // Encrypted vault record
+        string address;                 // Public address
+    };
+
+    // ========================================
+    // VAULT MANAGEMENT FUNCTIONS (7 total)
+    // ========================================
+
+    // Generate a new BIP39 mnemonic phrase
+    [Throws=VaultError]
+    string generate_mnemonic_ffi();
+
+    // Create a new vault with random mnemonic
+    [Throws=VaultError]
+    VaultRecord create_vault_ffi(string pin);
+
+    // Import vault from existing mnemonic
+    [Throws=VaultError]
+    VaultRecord create_vault_from_mnemonic_ffi(string pin, string mnemonic, string path);
+
+    // Import vault from private key hex
+    [Throws=VaultError]
+    VaultRecord create_vault_from_private_key_ffi(string pin, string private_key_hex);
+
+    // Verify PIN and return vault address
+    [Throws=VaultError]
+    string verify_pin_ffi(string pin, VaultRecord record);
+
+    // Rotate PIN (change old PIN to new PIN)
+    [Throws=VaultError]
+    VaultRecord rotate_pin_ffi(string old_pin, string new_pin, VaultRecord record);
+
+    // Migrate vault to new format/structure
+    [Throws=VaultError]
+    VaultRecord migrate_vault_ffi(string pin, VaultRecord record);
+
+    // ========================================
+    // TRANSACTION SIGNING FUNCTIONS (6 total)
+    // ========================================
+
+    // Sign legacy EVM transaction
+    [Throws=VaultError]
+    string sign_transaction_ffi(string pin, VaultRecord record, UnsignedLegacyTx tx);
+
+    // Sign EIP-1559 dynamic fee transaction
+    [Throws=VaultError]
+    string sign_transaction_eip1559_ffi(string pin, VaultRecord record, UnsignedEip1559Tx tx);
+
+    // Sign legacy EVM with explicit chain ID validation
+    [Throws=VaultError]
+    string sign_transaction_with_chain_ffi(string pin, VaultRecord record, UnsignedLegacyTx tx, u64 expected_chain_id);
+
+    // Sign EIP-1559 with explicit chain ID validation
+    [Throws=VaultError]
+    string sign_transaction_eip1559_with_chain_ffi(string pin, VaultRecord record, UnsignedEip1559Tx tx, u64 expected_chain_id);
+
+    // Sign Solana transaction message
+    [Throws=VaultError]
+    bytes sign_solana_transaction_ffi(string pin, VaultRecord record, bytes message);
+
+    // Sign Bitcoin transaction sighash
+    [Throws=VaultError]
+    string sign_bitcoin_transaction_ffi(string pin, VaultRecord record, string sighash_hex, boolean testnet);
+
+    // ========================================
+    // KEY DERIVATION & ADDRESS FUNCTIONS (5 total)
+    // ========================================
+
+    // Derive Bitcoin address from mnemonic
+    [Throws=VaultError]
+    string derive_btc_address_ffi(string mnemonic, boolean testnet);
+
+    // Derive Solana address from mnemonic
+    [Throws=VaultError]
+    string derive_sol_address_ffi(string mnemonic);
+
+    // Get Bitcoin public key for signing
+    [Throws=VaultError]
+    string get_btc_public_key_ffi(string pin, VaultRecord record, boolean testnet);
+
+    // Get all chain addresses (ETH, BTC, SOL) from vault
+    [Throws=VaultError]
+    MultichainAddresses get_multichain_addresses_ffi(string pin, VaultRecord record, boolean testnet);
+
+    // Get all chain addresses at specific HD index
+    [Throws=VaultError]
+    MultichainAddresses get_multichain_addresses_by_index_ffi(string pin, VaultRecord record, boolean testnet, u32 index);
+
+    // ========================================
+    // RECOVERY & BACKUP FUNCTIONS (6 total)
+    // ========================================
+
+    // Create encrypted recovery backup with passphrase
+    [Throws=VaultError]
+    RecoveryBackup create_recovery_backup_ffi(string pin, VaultRecord record, string backup_passphrase);
+
+    // Restore vault from recovery backup
+    [Throws=VaultError]
+    VaultRecord restore_vault_from_recovery_backup_ffi(string backup_passphrase, RecoveryBackup backup, string new_pin);
+
+    // Verify recovery backup integrity
+    [Throws=VaultError]
+    void verify_recovery_backup_ffi(string backup_passphrase, RecoveryBackup backup);
+
+    // Create cloud-safe recovery blob
+    [Throws=VaultError]
+    CloudRecoveryBlob create_cloud_recovery_blob_ffi(string pin, VaultRecord record, string oauth_kek);
+
+    // Restore vault from cloud blob
+    [Throws=VaultError]
+    VaultRecord restore_vault_from_cloud_recovery_blob_ffi(string oauth_kek, CloudRecoveryBlob blob, string new_pin);
+
+    // Verify cloud recovery blob integrity
+    [Throws=VaultError]
+    void verify_cloud_recovery_blob_ffi(string oauth_kek, CloudRecoveryBlob blob);
+
+    // ========================================
+    // WEB3AUTH INTEGRATION FUNCTIONS (2 total)
+    // ========================================
+
+    // Create wallet from Web3Auth OAuth private key
+    [Throws=VaultError]
+    Web3AuthWalletResult create_wallet_from_web3auth_key_ffi(string web3auth_private_key, boolean testnet);
+
+    // Restore wallet from Web3Auth key + encrypted data
+    [Throws=VaultError]
+    Web3AuthWalletResult restore_wallet_from_web3auth_key_ffi(string web3auth_private_key, string encrypted_data, boolean testnet);
+
+    // ========================================
+    // OPTIONAL: Key Export (gated feature)
+    // ========================================
+
+    // Export Ethereum private key (requires "dangerous-key-export" feature)
+    // WARNING: Only enable in development environments
+    [Throws=VaultError]
+    string export_eth_private_key_ffi(string pin, VaultRecord record);
+
+};  // end namespace wallet

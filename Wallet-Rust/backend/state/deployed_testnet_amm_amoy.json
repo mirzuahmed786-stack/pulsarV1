@@ -1,0 +1,10 @@
+{
+  "UniswapV2Factory": "0x4D949c12ECbEBE3012b5f3d4523919D604693005",
+  "UniswapV2Router": "0xbE26805219e64f9157f8493217b3523187e8761d",
+  "tokens": {
+    "WMATIC": "0x623661F82d5d43007aED47DaaBA13964C3d59736",
+    "USDC": "0xF3cd57A85d81362Ca741126e548dEfCe6d590604"
+  },
+  "baseToken": "WMATIC",
+  "network": "amoy"
+}

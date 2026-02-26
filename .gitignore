@@ -1,0 +1,43 @@
+# Ignore environment files
+*.env
+.env
+**/.env
+
+# Ignore backup of nested repo metadata
+Wallet-Rust/.git.bak
+
+# IDE, local configs
+.idea/
+.vscode/
+*.iml
+local.properties
+
+# Android / Kotlin build outputs
+**/build/
+**/app/build/
+front-kotlin/android/android/app/build/
+front-kotlin/android/android/.gradle/
+
+# Gradle
+.gradle/
+
+# Rust/Cargo
+**/target/
+Wallet-Rust/target/
+core-rust/target/
+wasm/target/
+
+# Node
+node_modules/
+
+# Generated / intermediate files
+**/generated/
+**/build/generated/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keystores and sensitive files
+*.keystore
+*.jks

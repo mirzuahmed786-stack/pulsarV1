@@ -1,0 +1,131 @@
+{
+  "title": "Elementa RPC Abuse",
+  "uid": "elementa-rpc-abuse",
+  "schemaVersion": 39,
+  "version": 3,
+  "timezone": "browser",
+  "tags": ["elementa", "security", "rpc"],
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Single Method Rate-Limit Hits (5m rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elementa_rpc_method_rate_limited_single_total[5m])",
+          "legendFormat": "single/s"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Batch Item Rate-Limit Hits (5m rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elementa_rpc_method_rate_limited_batch_total[5m])",
+          "legendFormat": "batch/s"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Single Total",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elementa_rpc_method_rate_limited_single_total"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Batch Total",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "elementa_rpc_method_rate_limited_batch_total"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "API Reject Reasons (5m rate by reason)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(elementa_api_reject_reason_total[5m]))",
+          "legendFormat": "{{reason}}/s"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Reject Totals By Reason",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (elementa_api_reject_reason_total)",
+          "legendFormat": "{{reason}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Cloud Blob Throttle Hits (5m rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 30 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (rate(elementa_api_reject_reason_total{reason=~\"cloud_blob_read_rate_limited|cloud_blob_write_rate_limited\"}[5m]))",
+          "legendFormat": "{{reason}}/s"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cloud Blob Validation Failures (5m rate)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 30 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(elementa_api_reject_reason_total{reason=\"cloud_blob_validation_failed\"}[5m])",
+          "legendFormat": "validation/s"
+        }
+      ]
+    }
+  ]
+}

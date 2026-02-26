@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wallet logo - exact replica of the PULSAR starburst icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="80dp"
+    android:height="80dp"
+    android:viewportWidth="80"
+    android:viewportHeight="80">
+    <!-- Cyan square background -->
+    <path
+        android:fillColor="#13E1EC"
+        android:pathData="M0,0h80v80h-80z"/>
+    
+    <group
+        android:translateX="40"
+        android:translateY="40">
+        <!-- Center dark circle -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M0,0m-9,0a9,9 0,1,1 18,0a9,18 0,1,1 -18,0"/>
+        
+        <!-- Top ray (vertical rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-2.5,-13L2.5,-13L2.5,-22L-2.5,-22Z"/>
+        <!-- Bottom ray (vertical rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-2.5,13L2.5,13L2.5,22L-2.5,22Z"/>
+        <!-- Right ray (horizontal rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M13,-2.5L13,2.5L22,2.5L22,-2.5Z"/>
+        <!-- Left ray (horizontal rectangle) -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-13,-2.5L-13,2.5L-22,2.5L-22,-2.5Z"/>
+        <!-- Top-right diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M9.2,-9.2L13,-13L18.4,-7.6L14.6,-3.8Z"/>
+        <!-- Top-left diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-9.2,-9.2L-13,-13L-18.4,-7.6L-14.6,-3.8Z"/>
+        <!-- Bottom-right diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M9.2,9.2L13,13L18.4,7.6L14.6,3.8Z"/>
+        <!-- Bottom-left diagonal ray -->
+        <path
+            android:fillColor="#1E2530"
+            android:pathData="M-9.2,9.2L-13,13L-18.4,7.6L-14.6,3.8Z"/>
+    </group>
+</vector>

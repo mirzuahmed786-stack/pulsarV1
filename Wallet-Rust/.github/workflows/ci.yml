@@ -1,0 +1,172 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  architecture-size-guards:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enforce frontend file-size guards
+        run: node check-file-size.mjs
+
+      - name: Enforce rust module-size guards
+        shell: pwsh
+        run: ./check_rust_file_size.ps1
+
+  rust-backend-cloud-security:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            Wallet-Rust/backend
+
+      - name: Run cloud security contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            contract_wallet_blob_write_rate_limited_returns_429
+            contract_wallet_blob_read_rate_limited_returns_429
+            metrics_exposes_cloud_blob_reject_reason_counters
+          )
+
+          for t in "${tests[@]}"; do
+            echo "Running $t"
+            cargo test -p earth_backend "$t" -- --nocapture
+          done
+
+  rust-backend-rpc-security:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            Wallet-Rust/backend
+
+      - name: Run RPC security contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests=(
+            contract_rpc_proxy_rejects_non_post
+            contract_rpc_proxy_rejects_disallowed_method
+            contract_rpc_proxy_batch_rejects_disallowed_item_with_jsonrpc_error
+            contract_rpc_proxy_rejects_payload_too_large
+            contract_rpc_proxy_rejects_batch_too_large
+            contract_rpc_proxy_method_bucket_exhaustion_single_returns_429
+            contract_rpc_proxy_method_bucket_exhaustion_batch_returns_jsonrpc_error
+            metrics_exposes_rpc_rate_limit_counters
+          )
+
+          for t in "${tests[@]}"; do
+            echo "Running $t"
+            cargo test -p earth_backend "$t" -- --nocapture
+          done
+
+  rust-backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            Wallet-Rust/backend
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test -p earth_backend
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: Wallet-Rust/frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  frontend-swap-endpoint-guard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Wallet-Rust/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: Wallet-Rust/frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Enforce swap endpoint guard
+        run: npm run test:swap-guard

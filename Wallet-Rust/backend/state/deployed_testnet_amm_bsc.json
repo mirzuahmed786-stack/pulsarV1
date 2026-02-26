@@ -1,0 +1,28 @@
+{
+  "UniswapV2Factory": "0x911bc53ee753d827a88F9BE782EA6a89C381175c",
+  "UniswapV2Router": "0x85D3D4B40C2B1D6d1Fd4dF6ee98B13B52D2192a7",
+  "tokens": {
+    "WBNB": "0x6B004cb9a67043f942f73a244E97bb7B9e5B8160",
+    "WETH": "0x0d24dF2a316c5b9ae8389884dd737a8D3A1f32E2",
+    "USDC": "0x821b8e2B3AA9851b0441979A1fFBA2eDf69d7328"
+  },
+  "tokensMeta": {
+    "WBNB": {
+      "address": "0x6B004cb9a67043f942f73a244E97bb7B9e5B8160",
+      "symbol": "WBNB",
+      "decimals": 18
+    },
+    "WETH": {
+      "address": "0x0d24dF2a316c5b9ae8389884dd737a8D3A1f32E2",
+      "symbol": "WETH",
+      "decimals": 18
+    },
+    "USDC": {
+      "address": "0x821b8e2B3AA9851b0441979A1fFBA2eDf69d7328",
+      "symbol": "USDC",
+      "decimals": 18
+    }
+  },
+  "baseToken": "WBNB",
+  "network": "bsc"
+}
