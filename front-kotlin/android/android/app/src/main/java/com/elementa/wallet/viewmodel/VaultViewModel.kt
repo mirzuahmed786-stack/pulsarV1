@@ -2,6 +2,7 @@ package com.elementa.wallet.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elementa.wallet.data.storage.FailureAttemptTracker
 import com.elementa.wallet.domain.repository.VaultRepository
 import com.elementa.wallet.domain.usecase.HasConfiguredPinUseCase
 import com.elementa.wallet.domain.usecase.LockVaultUseCase
@@ -18,7 +19,8 @@ class VaultViewModel @Inject constructor(
     private val hasConfiguredPinUseCase: HasConfiguredPinUseCase,
     private val setPinUseCase: SetPinUseCase,
     private val unlockVaultUseCase: UnlockVaultUseCase,
-    private val lockVaultUseCase: LockVaultUseCase
+    private val lockVaultUseCase: LockVaultUseCase,
+    private val failureTracker: FailureAttemptTracker  // NEW: Lockout tracking
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<VaultUiState>(VaultUiState.Locked)
@@ -33,19 +35,52 @@ class VaultViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             _isPinConfigured.value = hasConfiguredPinUseCase.execute()
-            _uiState.value = VaultUiState.Locked
+            
+            // Check if user is currently locked out
+            val failureState = failureTracker.getFailureState()
+            if (failureState.attemptCount >= 10) {
+                _uiState.value = VaultUiState.FactoryResetRequired
+            } else if (failureState.isLockedByTimeout) {
+                _uiState.value = VaultUiState.Locked
+            } else {
+                _uiState.value = VaultUiState.Locked
+            }
         }
     }
 
-    // Attempts to unlock with a PIN.
+    // ✅ ENHANCED: Attempts to unlock with a PIN, tracking failures and enforcing lockouts
     fun attemptUnlock(pin: String) {
         viewModelScope.launch {
+            // 1. Check if currently locked out
+            val currentState = failureTracker.getFailureState()
+            if (currentState.attemptCount >= 10) {
+                _uiState.value = VaultUiState.FactoryResetRequired
+                return@launch
+            }
+            if (currentState.isLockedByTimeout) {
+                val minutesLeft = failureTracker.getMinutesUntilRetry()
+                _uiState.value = VaultUiState.Error("Wallet locked. Try again in $minutesLeft minutes.")
+                return@launch
+            }
+            
+            // 2. Attempt unlock
             _uiState.value = VaultUiState.Authenticating
             val result = unlockVaultUseCase.execute(pin)
+            
             if (result.isSuccess) {
+                // SUCCESS: Clear failure counter
+                failureTracker.clearFailureAttempts()
                 _uiState.value = VaultUiState.Unlocked
             } else {
-                _uiState.value = VaultUiState.Error("Invalid PIN")
+                // FAILURE: Record attempt and check for lockout
+                val failureRecord = failureTracker.recordFailureAttempt()
+                
+                // Check if we should factory reset (10 attempts)
+                if (failureRecord.attemptCount >= 10) {
+                    _uiState.value = VaultUiState.FactoryResetRequired
+                } else {
+                    _uiState.value = VaultUiState.Error(failureRecord.getDisplayMessage())
+                }
             }
         }
     }
@@ -100,6 +135,7 @@ class VaultViewModel @Inject constructor(
             val result = unlockVaultUseCase.execute(pin)
             if (result.isSuccess) {
                 repository.clearVault()
+                failureTracker.forceReset()
                 _isPinConfigured.value = false
                 _uiState.value = VaultUiState.Locked
                 onComplete(true)
@@ -108,6 +144,26 @@ class VaultViewModel @Inject constructor(
             }
         }
     }
+    
+    // ✅ NEW: Factory reset flow (triggered after 10 failed attempts or user choice)
+    fun factoryReset() {
+        viewModelScope.launch {
+            repository.clearVault()
+            failureTracker.forceReset()
+            _isPinConfigured.value = false
+            _uiState.value = VaultUiState.Locked
+        }
+    }
+    
+    // ✅ NEW: Get current lockout state for UI display
+    suspend fun getLockoutMinutes(): Long {
+        return failureTracker.getMinutesUntilRetry()
+    }
+    
+    // ✅ NEW: Check if user is currently locked out (for UI disable)
+    suspend fun isCurrentlyLocked(): Boolean {
+        return failureTracker.isCurrentlyLocked()
+    }
 }
 
 sealed class VaultUiState {
@@ -115,4 +171,5 @@ sealed class VaultUiState {
     object Authenticating : VaultUiState()
     object Unlocked : VaultUiState()
     data class Error(val message: String) : VaultUiState()
+    object FactoryResetRequired : VaultUiState()  // NEW: Requires factory reset
 }

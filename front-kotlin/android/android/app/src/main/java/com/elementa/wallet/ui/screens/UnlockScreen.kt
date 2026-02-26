@@ -16,8 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.clickable
@@ -33,17 +36,23 @@ import kotlinx.coroutines.delay
 // Displays the unlock flow for the vault.
 fun UnlockScreen(
     viewModel: VaultViewModel,
-    onUnlocked: () -> Unit
+    onUnlocked: () -> Unit,
+    onForgotPin: () -> Unit = {}  // ✅ NEW: Navigate to ForgotPinScreen
 ) {
     var pin by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }  // ✅ NEW: Explicit error tracking
     // Prevent multiple rapid submissions / race that caused the 5-digit hang
     var isSubmitting by remember { mutableStateOf(false) }
+    var isLocked by remember { mutableStateOf(false) }  // ✅ NEW: Track lockout state
     val uiState by viewModel.uiState.collectAsState()
     val bioMetricsEnabled by viewModel.bioMetricsEnabled.collectAsState()
     val screenHeight = LocalConfiguration.current.screenHeightDp
     val keypadKeySize = if (screenHeight < 700) 64.dp else 72.dp
     val keypadRowSpacing = if (screenHeight < 700) 14.dp else 20.dp
+    
+    // ✅ NEW: Haptic feedback for errors
+    val hapticFeedback = LocalHapticFeedback.current
 
     LaunchedEffect(Unit) {
         viewModel.lock()
@@ -55,11 +64,20 @@ fun UnlockScreen(
             is VaultUiState.Unlocked -> onUnlocked()
             is VaultUiState.Error -> {
                 isError = true
+                errorMessage = (uiState as VaultUiState.Error).message
+                
+                // ✅ NEW: Haptic feedback on error
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                
                 // Allow re-entry after a short delay and clear submitting flag
                 delay(800)
                 pin = ""
                 isError = false
                 isSubmitting = false
+            }
+            is VaultUiState.FactoryResetRequired -> {
+                // ✅ NEW: Navigate to Forgot PIN flow for mandatory reset
+                onForgotPin()
             }
             else -> Unit
         }
@@ -114,55 +132,69 @@ fun UnlockScreen(
                     )
                 }
             }
+            
+            // ✅ NEW: Error message display
+            if (isError && errorMessage.isNotEmpty()) {
+                Text(
+                    text = errorMessage,
+                    color = Color(0xFFEF4444),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Push keyboard to bottom with flexible spacer
+            Spacer(modifier = Modifier.weight(1f))
+
             // Keypad Section
-                PulsarKeyboard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                    keySize = keypadKeySize,
-                    rowSpacing = keypadRowSpacing,
-                    onDigit = { digit ->
-                        if (!isSubmitting && pin.length < 6) {
-                            pin += digit
-                            if (pin.length == 6) {
-                                isSubmitting = true
-                                viewModel.attemptUnlock(pin)
-                            }
+            PulsarKeyboard(
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 16.dp),
+                keySize = keypadKeySize,
+                rowSpacing = keypadRowSpacing,
+                onDigit = { digit ->
+                    if (!isSubmitting && pin.length < 6) {
+                        pin += digit
+                        if (pin.length == 6) {
+                            isSubmitting = true
+                            viewModel.attemptUnlock(pin)
                         }
-                    },
-                    onDelete = { if (!isSubmitting && pin.isNotEmpty()) pin = pin.dropLast(1) },
-                    bottomLeftSlot = if (bioMetricsEnabled) ({
-                        Surface(
-                            onClick = { viewModel.authenticateBiometrically() },
-                            shape = RoundedCornerShape(18.dp),
-                            color = PulsarColors.PanelDark.copy(alpha = 0.65f),
-                            border = BorderStroke(1.dp, PulsarColors.BorderSubtleDark),
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Fingerprint,
-                                    contentDescription = "Biometric",
-                                    tint = Color.White.copy(alpha = 0.75f),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
+                    }
+                },
+                onDelete = { if (!isSubmitting && pin.isNotEmpty()) pin = pin.dropLast(1) },
+                bottomLeftSlot = if (bioMetricsEnabled) ({
+                    Surface(
+                        onClick = { viewModel.authenticateBiometrically() },
+                        shape = RoundedCornerShape(18.dp),
+                        color = PulsarColors.PanelDark.copy(alpha = 0.65f),
+                        border = BorderStroke(1.dp, PulsarColors.BorderSubtleDark),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Fingerprint,
+                                contentDescription = "Biometric",
+                                tint = Color.White.copy(alpha = 0.75f),
+                                modifier = Modifier.size(28.dp)
+                            )
                         }
-                    }) else null
-                )
+                    }
+                }) else null
+            )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(bottom = 28.dp),
+                    .padding(bottom = 20.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    onClick = { },
+                    onClick = onForgotPin,  // ✅ UPDATED: Navigate to ForgotPinScreen
                     shape = RoundedCornerShape(20.dp),
                     color = Color.Transparent,
                     border = BorderStroke(1.dp, PulsarColors.BorderSubtleDark)
