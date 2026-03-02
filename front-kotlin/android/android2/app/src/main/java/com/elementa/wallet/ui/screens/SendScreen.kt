@@ -1,5 +1,6 @@
 package com.elementa.wallet.ui.screens
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -18,80 +19,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.elementa.wallet.ui.components.RedesignedBottomNav
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.graphics.Brush
-import com.elementa.wallet.ui.designsystem.*
-import com.elementa.wallet.viewmodel.SendViewModel
 import com.elementa.wallet.R
+import com.elementa.wallet.ui.components.PulsarBottomNav
+import com.elementa.wallet.ui.designsystem.*
+// PulsarSlideToConfirm is a top-level function in designsystem
+import com.elementa.wallet.viewmodel.SendViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-// ─────────────────────────────────────────────────────────────
-// Token Data Model for Selection
-// ─────────────────────────────────────────────────────────────
-
-data class SelectableToken(
-    val symbol: String,
-    val name: String,
-    val balance: String,
-    val balanceUsd: Double,
-    val iconLetter: String = symbol.firstOrNull()?.toString() ?: "?"
-)
-
-// ─────────────────────────────────────────────────────────────
-// Address Validation Utilities
-// ─────────────────────────────────────────────────────────────
-
-private fun isValidEthereumAddress(address: String): Boolean {
-    // Basic Ethereum address validation: 0x followed by 40 hex characters
-    return address.matches(Regex("^0x[a-fA-F0-9]{40}$"))
-}
-
-private fun isValidSolanaAddress(address: String): Boolean {
-    // Solana addresses are base58 encoded, typically 32-44 characters
-    return address.matches(Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$"))
-}
-
-private fun isValidBitcoinAddress(address: String): Boolean {
-    // Basic Bitcoin address validation (P2PKH, P2SH, Bech32)
-    return address.matches(Regex("^(1|3|bc1)[a-zA-HJ-NP-Z0-9]{25,62}$"))
-}
-
-private fun validateRecipientAddress(address: String): AddressValidation {
-    if (address.isBlank()) return AddressValidation.EMPTY
-    
-    return when {
-        isValidEthereumAddress(address) -> AddressValidation.VALID_ETH
-        isValidSolanaAddress(address) -> AddressValidation.VALID_SOL
-        isValidBitcoinAddress(address) -> AddressValidation.VALID_BTC
-        address.length < 10 -> AddressValidation.INCOMPLETE
-        else -> AddressValidation.INVALID
-    }
-}
-
-private enum class AddressValidation {
-    EMPTY,
-    INCOMPLETE,
-    VALID_ETH,
-    VALID_SOL,
-    VALID_BTC,
-    INVALID
-}
-
-// ─────────────────────────────────────────────────────────────
-// Send Screen Composable
-// ─────────────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -102,6 +48,8 @@ fun SendScreen(
     onTransfers: () -> Unit,
     onSwap: () -> Unit,
     onActivity: () -> Unit,
+    onHub: () -> Unit,
+    onSettings: () -> Unit,
     onContinue: (String, String) -> Unit,
     onQrScan: () -> Unit = {},
     initialRecipient: String = "",
@@ -109,33 +57,38 @@ fun SendScreen(
 ) {
     var amount by remember { mutableStateOf("0.00") }
     var recipient by remember { mutableStateOf(initialRecipient) }
-    var selectedTab by remember { mutableStateOf("Standard") }
+    var selectedFee by remember { mutableStateOf("Standard") }
+    var showAssetSelector by remember { mutableStateOf(false) }
+    var showPinSheet by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     
-    // Update recipient when initialRecipient changes (e.g. from QR scan result)
+    // Default asset
+    var selectedAsset by remember { mutableStateOf(AssetItem("Ethereum", "ETH", 1.45, 4060.00, R.drawable.image_ethereum)) }
+    
+    val sheetState = rememberModalBottomSheetState()
+    
+    // Update recipient when initialRecipient changes
     LaunchedEffect(initialRecipient) {
         if (initialRecipient.isNotEmpty()) {
             recipient = initialRecipient
+            clipboardManager.setText(AnnotatedString(initialRecipient))
         }
     }
     
-    // Default selected token: Ethereum
-    var selectedToken by remember { 
-        mutableStateOf(SelectableToken("ETH", "Ethereum", "1.45", 4060.00)) 
-    }
-    
-    val balanceDouble = selectedToken.balance.replace(",", "").toDoubleOrNull() ?: 1.45
-    val usdValue = (amount.toDoubleOrNull() ?: 0.0) * (selectedToken.balanceUsd / balanceDouble)
+    val pulsarBlue = Color(0xFF00D3F2)
 
-    PulsarBackground {
+    Box(modifier = Modifier.fillMaxSize().background(Color(0xFF040A20))) {
         Scaffold(
             containerColor = Color.Transparent,
             bottomBar = {
-                RedesignedBottomNav(
-                    onDashboard = onDashboard,
+                PulsarBottomNav(
+                    onHome = onDashboard,
                     onAssets = onAssets,
-                    onTransfers = onTransfers,
-                    onSwap = onSwap,
+                    onHub = onHub,
                     onActivity = onActivity,
+                    onSettings = onSettings,
                     currentRoute = "transfers"
                 )
             }
@@ -145,30 +98,32 @@ fun SendScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp)
+                    .padding(horizontal = 24.dp)
             ) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
-                // --- Header Section ---
+                // --- Header matching Image 2 ---
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Surface(
+                        onClick = onBack,
                         shape = CircleShape,
-                        color = Color(0xFF031627),
-                        modifier = Modifier.size(56.dp)
+                        color = Color(0xFF0D1421).copy(alpha = 0.6f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.ArrowOutward,
-                                contentDescription = null,
-                                tint = Color(0xFF0092B8),
-                                modifier = Modifier.size(24.dp)
+                                painter = painterResource(id = R.drawable.send_page_arrow),
+                                contentDescription = "Back",
+                                tint = pulsarBlue,
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
                             "Send",
@@ -179,88 +134,90 @@ fun SendScreen(
                         Text(
                             "Transfer assets to another wallet",
                             fontSize = 15.sp,
-                            color = Color.White.copy(alpha = 0.6f)
+                            color = Color.White.copy(alpha = 0.5f)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp)) // Reduced spacing
 
-                // --- Main Send Card ---
+                // --- Main Card matching Image 2 ---
                 Surface(
                     shape = RoundedCornerShape(24.dp),
-                    color = Color(0xFF0D1421).copy(alpha = 0.8f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+                    color = Color(0xFF0D1421).copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                    Column(modifier = Modifier.padding(24.dp)) {
                         
                         // Asset Selector
                         Text(
                             "Asset",
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             color = Color.White.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF030712),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                            color = Color(0xFF030712).copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = { /* Open selector */ }
+                            onClick = { showAssetSelector = true }
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Image(
-                                    painter = painterResource(id = R.drawable.image_ethereum),
+                                    painter = painterResource(id = selectedAsset.icon),
                                     contentDescription = null,
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(32.dp)
                                 )
-                                Spacer(modifier = Modifier.width(14.dp))
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Text(
-                                    selectedToken.name,
+                                    selectedAsset.name,
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
+                                Spacer(modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.KeyboardArrowDown, null, tint = Color.White.copy(alpha = 0.4f))
                             }
                         }
                         
                         Row(
-                            modifier = Modifier.padding(top = 10.dp, bottom = 28.dp).fillMaxWidth(),
+                            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp).fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                "Balance: ${selectedToken.balance} ${selectedToken.symbol}",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.35f)
+                                text = "Balance: ${selectedAsset.balance} ${selectedAsset.symbol}",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 14.sp
                             )
                             Text(
-                                "≈ $${String.format("%,.2f", selectedToken.balanceUsd)}",
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.35f)
+                                text = "≈ $${selectedAsset.usdValue}",
+                                color = Color.White.copy(alpha = 0.4f),
+                                fontSize = 14.sp
                             )
                         }
 
                         // Amount Input
                         Text(
                             "Amount",
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             color = Color.White.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF030712),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                            color = Color(0xFF030712).copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 BasicTextField(
@@ -272,47 +229,53 @@ fun SendScreen(
                                     },
                                     textStyle = TextStyle(
                                         color = Color.White,
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Medium
+                                        fontSize = 19.sp,
+                                        fontWeight = FontWeight.Bold
                                     ),
                                     modifier = Modifier.weight(1f),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    cursorBrush = SolidColor(Color(0xFF0092B8))
+                                    cursorBrush = SolidColor(pulsarBlue),
+                                    decorationBox = { innerTextField ->
+                                        if (amount.isEmpty() || amount == "0.00") {
+                                            Text("0.00", color = Color.White.copy(alpha = 0.3f), fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        innerTextField()
+                                    }
                                 )
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = Color(0xFF0B1B2B),
-                                    onClick = { amount = balanceDouble.toString() }
+                                    color = Color(0xFF1D293D).copy(alpha = 0.9f),
+                                    onClick = { amount = selectedAsset.balance.toString() }
                                 ) {
                                     Text(
                                         "MAX",
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.ExtraBold,
-                                        color = Color(0xFF0092B8)
+                                        color = pulsarBlue
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(28.dp))
 
                         // Recipient Address
                         Text(
                             "Recipient Address",
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             color = Color.White.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xFF030712),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                            color = Color(0xFF030712).copy(alpha = 0.8f),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.padding(16.dp),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 BasicTextField(
@@ -326,106 +289,248 @@ fun SendScreen(
                                     decorationBox = { innerTextField ->
                                         if (recipient.isEmpty()) {
                                             Text(
-                                                "Enter ETH address",
+                                                "Enter ${selectedAsset.symbol} address",
                                                 color = Color.White.copy(alpha = 0.3f),
                                                 fontSize = 15.sp
                                             )
                                         }
                                         innerTextField()
                                     },
-                                    cursorBrush = SolidColor(Color(0xFF0092B8))
+                                    cursorBrush = SolidColor(pulsarBlue)
                                 )
-                                IconButton(onClick = onQrScan, modifier = Modifier.size(24.dp)) {
+                                IconButton(onClick = onQrScan, modifier = Modifier.size(28.dp)) {
                                     Icon(
                                         painter = painterResource(id = R.drawable.scan_qr_icon),
-                                        contentDescription = null,
+                                        contentDescription = "Scan",
                                         tint = Color.White.copy(alpha = 0.4f),
-                                        modifier = Modifier.size(20.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(28.dp))
 
                         // Network Fee
                         Text(
                             "Network Fee",
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             color = Color.White.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            FeeOptionCard(
+                            SendFeeCard(
                                 title = "Standard",
                                 time = "~5 mins",
-                                isSelected = selectedTab == "Standard",
-                                onClick = { selectedTab = "Standard" },
+                                isSelected = selectedFee == "Standard",
+                                onClick = { selectedFee = "Standard" },
                                 modifier = Modifier.weight(1f)
                             )
-                            FeeOptionCard(
+                            SendFeeCard(
                                 title = "Priority",
                                 time = "~1 min",
-                                isSelected = selectedTab == "Priority",
-                                onClick = { selectedTab = "Priority" },
+                                isSelected = selectedFee == "Priority",
+                                onClick = { selectedFee = "Priority" },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(40.dp)) // Reduced spacing
 
-                // Review Button
-                Surface(
-                    onClick = { onContinue(amount, recipient) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF0092B8),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "Review Transaction",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Icon(Icons.Default.ArrowForward, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                // Updated Swipe to Send as requested
+                PulsarSlideToConfirm(
+                    onConfirm = {
+                        if (amount.toDoubleOrNull() ?: 0.0 > 0 && recipient.isNotEmpty()) {
+                            showPinSheet = true
+                        } else {
+                            // Reset swipe or show error toast
+                            Toast.makeText(context, "Enter valid amount and address", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    text = "Slide to Send ${selectedAsset.symbol}",
+                    thumbColor = pulsarBlue
+                )
+                
+                Spacer(modifier = Modifier.height(30.dp))
+            }
+        }
+
+        if (showAssetSelector) {
+            ModalBottomSheet(
+                onDismissRequest = { showAssetSelector = false },
+                sheetState = sheetState,
+                containerColor = Color(0xFF030712),
+                contentColor = Color.White
+            ) {
+                AssetSelectorContent(
+                    selectedAsset = selectedAsset,
+                    onAssetSelected = { 
+                        selectedAsset = it
+                        showAssetSelector = false
+                    }
+                )
+            }
+        }
+
+        if (showPinSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showPinSheet = false },
+                containerColor = Color(0xFF0D1421),
+                contentColor = Color.White
+            ) {
+                PinEntrySheetContent(
+                    onPinSuccess = {
+                        showPinSheet = false
+                        Toast.makeText(context, "Transaction Sent Successfully!", Toast.LENGTH_LONG).show()
+                        scope.launch {
+                            delay(500)
+                            onDashboard()
                         }
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(40.dp))
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FeeOptionCard(
+private fun PinEntrySheetContent(onPinSuccess: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    val maxPinLength = 6
+    
+    Column(
+        modifier = Modifier.padding(24.dp).padding(bottom = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text("Enter Security PIN", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("Please enter your 6-digit PIN to authorize the transaction", color = Color.White.copy(alpha = 0.5f), textAlign = TextAlign.Center)
+        
+        Spacer(modifier = Modifier.height(40.dp))
+        
+        // PIN Dots
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            repeat(maxPinLength) { index ->
+                Box(
+                    modifier = Modifier
+                        .size(16.dp)
+                        .background(
+                            if (index < pin.length) Color(0xFF00D3F2) else Color.White.copy(alpha = 0.15f),
+                            CircleShape
+                        )
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(48.dp))
+        
+        // Simple numeric keypad
+        val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "DEL")
+        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            keys.chunked(3).forEach { row ->
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                    row.forEach { key ->
+                        if (key.isNotEmpty()) {
+                            Surface(
+                                onClick = {
+                                    if (key == "DEL") {
+                                        if (pin.isNotEmpty()) pin = pin.dropLast(1)
+                                    } else {
+                                        if (pin.length < maxPinLength) {
+                                            pin += key
+                                            if (pin.length == maxPinLength) {
+                                                onPinSuccess()
+                                            }
+                                        }
+                                    }
+                                },
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.05f),
+                                modifier = Modifier.size(72.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    if (key == "DEL") {
+                                        Icon(Icons.Default.Backspace, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    } else {
+                                        Text(key, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.size(72.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssetSelectorContent(
+    selectedAsset: AssetItem,
+    onAssetSelected: (AssetItem) -> Unit
+) {
+    val assets = listOf(
+        AssetItem("Ethereum", "ETH", 1.45, 4060.00, R.drawable.image_ethereum),
+        AssetItem("Bitcoin", "BTC", 0.05, 3100.00, R.drawable.image_bitcoin),
+        AssetItem("Solana", "SOL", 145.2, 20328.00, R.drawable.image_solana),
+        AssetItem("BSC", "BNB", 2.5, 1500.00, R.drawable.image_ethereum), // Reusing ETH icon as placeholder if BNB missing
+        AssetItem("Polygon", "POL", 500.0, 450.00, R.drawable.image_ethereum),
+        AssetItem("Avalanche", "AVAX", 15.0, 600.00, R.drawable.image_ethereum)
+    )
+
+    Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+        Text("Select Asset", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Spacer(modifier = Modifier.height(20.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(assets) { asset ->
+                Surface(
+                    onClick = { onAssetSelected(asset) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (asset.symbol == selectedAsset.symbol) Color(0xFF1D293D) else Color.White.copy(alpha = 0.05f),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Image(painter = painterResource(id = asset.icon), contentDescription = null, modifier = Modifier.size(32.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(asset.name, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(asset.symbol, color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+@Composable
+private fun SendFeeCard(
     title: String,
     time: String,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val pulsarBlue = Color(0xFF00D3F2)
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF030712),
+        color = Color(0xFF030712).copy(alpha = 0.8f),
         border = BorderStroke(
             1.dp, 
-            if (isSelected) Color(0xFF0092B8).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.05f)
+            if (isSelected) pulsarBlue else Color.White.copy(alpha = 0.1f)
         ),
-        modifier = modifier.height(84.dp)
+        modifier = modifier.height(95.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -434,372 +539,16 @@ private fun FeeOptionCard(
             Text(
                 title,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color(0xFF0092B8) else Color.White
+                fontWeight = FontWeight.ExtraBold,
+                color = if (isSelected) pulsarBlue else Color.White
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 time,
                 fontSize = 13.sp,
-                color = if (isSelected) Color(0xFF0092B8).copy(alpha = 0.7f) else Color.White.copy(alpha = 0.4f)
+                color = if (isSelected) pulsarBlue.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.4f),
+                fontWeight = FontWeight.Medium
             )
-        }
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Send Screen Components
-// ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun SendTopBar(onBack: () -> Unit, onQrScan: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 16.dp)
-            .statusBarsPadding(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(PulsarColors.SurfaceDark.copy(alpha = 0.4f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
-        ) {
-            Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Back", tint = Color.White, modifier = Modifier.size(18.dp))
-        }
-        Text(
-            "TRANSFER FUNDS",
-            style = PulsarTypography.CyberLabel,
-            color = PulsarColors.PrimaryDark,
-            letterSpacing = 4.sp,
-            fontSize = 16.sp
-        )
-        IconButton(
-            onClick = { onQrScan() },
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(PulsarColors.SurfaceDark.copy(alpha = 0.4f))
-                .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
-        ) {
-            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan", tint = PulsarColors.PrimaryDark, modifier = Modifier.size(20.dp))
-        }
-    }
-}
-
-@Composable
-private fun RecipientAddressInput(
-    recipient: String,
-    onRecipientChange: (String) -> Unit,
-    validation: AddressValidation,
-    onQrScan: () -> Unit
-) {
-    val borderColor = when (validation) {
-        AddressValidation.VALID_ETH, 
-        AddressValidation.VALID_SOL, 
-        AddressValidation.VALID_BTC -> PulsarColors.SuccessGreen.copy(alpha = 0.5f)
-        AddressValidation.INVALID -> PulsarColors.DangerRed.copy(alpha = 0.5f)
-        else -> Color.White.copy(alpha = 0.1f)
-    }
-    
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = PulsarColors.SurfaceDark,
-        border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.05f),
-                    modifier = Modifier.size(44.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.width(14.dp))
-                
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "TO",
-                        style = PulsarTypography.CyberLabel,
-                        color = PulsarColors.PrimaryDark.copy(alpha = 0.8f),
-                        fontSize = 10.sp,
-                        letterSpacing = 1.sp
-                    )
-                    
-                    BasicTextField(
-                        value = recipient,
-                        onValueChange = onRecipientChange,
-                        textStyle = TextStyle(
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        singleLine = true,
-                        cursorBrush = SolidColor(PulsarColors.PrimaryDark),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
-                        decorationBox = { innerTextField ->
-                            Box {
-                                if (recipient.isEmpty()) {
-                                    Text(
-                                        "Enter wallet address",
-                                        color = Color.White.copy(alpha = 0.3f),
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                innerTextField()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                    )
-                }
-                
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                // Validation indicator
-                AnimatedVisibility(visible = recipient.isNotEmpty()) {
-                    Icon(
-                        imageVector = when (validation) {
-                            AddressValidation.VALID_ETH, 
-                            AddressValidation.VALID_SOL, 
-                            AddressValidation.VALID_BTC -> Icons.Default.CheckCircle
-                            AddressValidation.INVALID -> Icons.Default.Error
-                            else -> Icons.Default.HourglassEmpty
-                        },
-                        contentDescription = null,
-                        tint = when (validation) {
-                            AddressValidation.VALID_ETH, 
-                            AddressValidation.VALID_SOL, 
-                            AddressValidation.VALID_BTC -> PulsarColors.SuccessGreen
-                            AddressValidation.INVALID -> PulsarColors.DangerRed
-                            else -> Color.White.copy(alpha = 0.3f)
-                        },
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            
-            // Validation message
-            AnimatedVisibility(visible = validation == AddressValidation.INVALID) {
-                Text(
-                    "Invalid wallet address format",
-                    style = PulsarTypography.Typography.labelSmall,
-                    color = PulsarColors.DangerRed,
-                    modifier = Modifier.padding(top = 8.dp, start = 58.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SourceDestinationPanel(
-    label: String,
-    value: String,
-    icon: ImageVector,
-    isDestination: Boolean,
-    onAdd: (() -> Unit)? = null
-) {
-    Surface(
-        onClick = { },
-        shape = RoundedCornerShape(20.dp),
-        color = PulsarColors.SurfaceDark,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (isDestination) Color.White.copy(alpha = 0.05f) else PulsarColors.PrimaryDark.copy(alpha = 0.1f),
-                modifier = Modifier.size(44.dp),
-                border = BorderStroke(1.dp, if (isDestination) Color.White.copy(alpha = 0.1f) else PulsarColors.PrimaryDark.copy(alpha = 0.2f))
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isDestination) Color.White.copy(alpha = 0.4f) else PulsarColors.PrimaryDark,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    label,
-                    style = PulsarTypography.CyberLabel,
-                    color = PulsarColors.PrimaryDark.copy(alpha = 0.8f),
-                    fontSize = 10.sp,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    value,
-                    style = PulsarTypography.Typography.bodyLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
-                )
-            }
-            
-            if (onAdd != null) {
-                Surface(
-                    onClick = onAdd,
-                    shape = RoundedCornerShape(8.dp),
-                    color = PulsarColors.PrimaryDark.copy(alpha = 0.05f),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = "Add", tint = PulsarColors.PrimaryDark, modifier = Modifier.size(18.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TokenSelectorSheet(
-    tokens: List<SelectableToken>,
-    selectedToken: SelectableToken,
-    onTokenSelected: (SelectableToken) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 32.dp)
-    ) {
-        Text(
-            "SELECT TOKEN",
-            style = PulsarTypography.CyberLabel,
-            color = PulsarColors.PrimaryDark,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.heightIn(max = 400.dp)
-        ) {
-            items(tokens) { token ->
-                val isSelected = token.symbol == selectedToken.symbol
-                Surface(
-                    onClick = { onTokenSelected(token) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isSelected) PulsarColors.PrimaryDark.copy(alpha = 0.1f) else PulsarColors.SurfaceDark,
-                    border = BorderStroke(
-                        1.dp, 
-                        if (isSelected) PulsarColors.PrimaryDark.copy(alpha = 0.4f) else Color.White.copy(alpha = 0.05f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = PulsarColors.PrimaryDark.copy(alpha = 0.15f),
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    token.iconLetter,
-                                    color = PulsarColors.PrimaryDark,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
-                                )
-                            }
-                        }
-                        
-                        Spacer(modifier = Modifier.width(14.dp))
-                        
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                token.name,
-                                style = PulsarTypography.Typography.titleMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                token.symbol,
-                                style = PulsarTypography.Typography.bodySmall,
-                                color = PulsarColors.TextSecondaryDark
-                            )
-                        }
-                        
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(
-                                token.balance,
-                                style = PulsarTypography.Typography.titleMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp
-                            )
-                            Text(
-                                "$${String.format("%,.2f", token.balanceUsd)}",
-                                style = PulsarTypography.Typography.bodySmall,
-                                color = PulsarColors.TextSecondaryDark
-                            )
-                        }
-                        
-                        if (isSelected) {
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = PulsarColors.PrimaryDark,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun KeypadButton(key: String, onClick: () -> Unit, modifier: Modifier) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = PulsarColors.SurfaceDark,
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
-        modifier = modifier.height(56.dp)
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (key == "backspace") {
-                Icon(Icons.Default.Backspace, contentDescription = "Backspace", tint = Color.White, modifier = Modifier.size(22.dp))
-            } else {
-                Text(
-                    key,
-                    style = PulsarTypography.Typography.titleLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp
-                )
-            }
         }
     }
 }

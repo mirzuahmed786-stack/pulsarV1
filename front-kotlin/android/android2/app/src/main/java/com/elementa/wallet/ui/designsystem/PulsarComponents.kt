@@ -7,6 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -389,14 +392,122 @@ object PulsarComponents {
                     }
                 }
             }
-            Text(
-                "PULSAR",
-                style = PulsarTypography.CyberLabel,
-                color = PulsarColors.PrimaryDark,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(top = 12.dp),
-                letterSpacing = 4.sp
-            )
+        }
+    }
+
+    /**
+     * Standardized Premium Logo for Onboarding screens
+     * Uses the brand assets with consistent glow and rocket badge
+     */
+    @Composable
+    fun PulsarPremiumLogo(
+        modifier: Modifier = Modifier,
+        size: androidx.compose.ui.unit.Dp = 140.dp,
+        iconSize: androidx.compose.ui.unit.Dp = 90.dp,
+        showRocket: Boolean = true
+    ) {
+        val pulsarBlue = Color(0xFF00D3F2)
+        
+        Box(
+            modifier = modifier.size(size + 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Outer Glow Circle
+            Surface(
+                shape = androidx.compose.foundation.shape.CircleShape,
+                color = Color(0xFF0D1421).copy(alpha = 0.8f),
+                modifier = Modifier.size(size),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    androidx.compose.foundation.Image(
+                        painter = androidx.compose.ui.res.painterResource(id = com.elementa.wallet.R.drawable.logo),
+                        contentDescription = "Pulsar Logo",
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            }
+
+            if (showRocket) {
+                // Mini Rocket Badge
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(id = com.elementa.wallet.R.drawable.ic_rocket_on_onboarding),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(size * 0.22f)
+                        .align(Alignment.BottomEnd)
+                        .offset(x = (-4).dp, y = (-4).dp)
+                )
+            }
+        }
+    }
+} // end object PulsarComponents
+
+// Slide to confirm component (Swipe to Send)
+// Secure and satisfying interaction for transaction confirmation
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PulsarSlideToConfirm(
+    modifier: Modifier = Modifier,
+    onConfirm: () -> Unit,
+    text: String = "Slide to Send",
+    thumbColor: Color = Color(0xFF00D3F2),
+    containerColor: Color = Color(0xFF1D293D).copy(alpha = 0.6f),
+    textColor: Color = Color.White.copy(alpha = 0.6f)
+) {
+    val swipeState = rememberSwipeToDismissBoxState()
+    
+    LaunchedEffect(swipeState.currentValue) {
+        if (swipeState.currentValue == SwipeToDismissBoxValue.EndToStart || swipeState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
+            onConfirm()
+            // Reset after some time if needed, but usually we navigate away
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .background(containerColor, RoundedCornerShape(20.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold
+        )
+
+        SwipeToDismissBox(
+            state = swipeState,
+            backgroundContent = { Box(Modifier.fillMaxSize()) },
+            enableDismissFromStartToEnd = true,
+            enableDismissFromEndToStart = false,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val offset = swipeState.requireOffset()
+            val progress = (offset / 1000f).coerceIn(0f, 1f) // heuristic for visuals
+            
+            Surface(
+                modifier = Modifier
+                    .size(64.dp)
+                    .padding(4.dp)
+                    .offset(x = 0.dp), // Fixed thumb handled by SwipeToDismissBox
+                shape = RoundedCornerShape(16.dp),
+                color = thumbColor,
+                shadowElevation = 8.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.ArrowForward,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
     }
 }
+

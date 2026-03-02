@@ -1,0 +1,111 @@
+name: Rust + Android Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android NDK
+        uses: android-actions/setup-ndk@v2
+        with:
+          ndk: '25.2.9519653'
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain-action@stable
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build Rust Android ABIs
+        working-directory: Wallet-Rust
+        run: |
+          chmod +x scripts/build_android_abies.sh || true
+          ./scripts/build_android_abies.sh
+
+      - name: Copy .so into Android project jniLibs
+        run: |
+          set -e
+          ANDROID_APP=front-kotlin/android/android
+          mkdir -p $ANDROID_APP/app/src/main/jniLibs/arm64-v8a
+          mkdir -p $ANDROID_APP/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p $ANDROID_APP/app/src/main/jniLibs/x86_64
+          cp Wallet-Rust/target/android-libs/arm64-v8a/libwallet_core.so $ANDROID_APP/app/src/main/jniLibs/arm64-v8a/ || true
+          cp Wallet-Rust/target/android-libs/armeabi-v7a/libwallet_core.so $ANDROID_APP/app/src/main/jniLibs/armeabi-v7a/ || true
+          cp Wallet-Rust/target/android-libs/x86_64/libwallet_core.so $ANDROID_APP/app/src/main/jniLibs/x86_64/ || true
+
+      - name: Run Android assembleDebug
+        working-directory: front-kotlin/android/android
+        run: |
+          ./gradlew assembleDebug --no-daemon --stacktrace
+name: Rust + Android CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-rust-android:
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/android-sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+
+      - name: Install cargo-ndk
+        run: |
+          cargo install cargo-ndk || true
+
+      - name: Install Android NDK (r21+)
+        uses: android-actions/setup-ndk@v2
+        with:
+          ndk-version: "r25b"
+
+      - name: Build Rust crate for Android ABIs
+        working-directory: Wallet-Rust
+        run: |
+          cargo ndk -t armeabi-v7a -t arm64-v8a -t x86_64 -- build --release
+
+      - name: Create jniLibs output
+        run: |
+          mkdir -p front-kotlin/android/android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p front-kotlin/android/android/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p front-kotlin/android/android/app/src/main/jniLibs/x86_64
+          cp Wallet-Rust/target/aarch64-linux-android/release/libwallet_core.so front-kotlin/android/android/app/src/main/jniLibs/arm64-v8a/
+          cp Wallet-Rust/target/armv7-linux-androideabi/release/libwallet_core.so front-kotlin/android/android/app/src/main/jniLibs/armeabi-v7a/ || true
+          cp Wallet-Rust/target/x86_64-linux-android/release/libwallet_core.so front-kotlin/android/android/app/src/main/jniLibs/x86_64/ || true
+
+  build-android:
+    runs-on: ubuntu-latest
+    needs: build-rust-android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Build Android (assembleDebug)
+        working-directory: front-kotlin/android/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace

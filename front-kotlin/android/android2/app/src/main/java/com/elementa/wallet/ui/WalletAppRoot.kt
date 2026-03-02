@@ -14,6 +14,7 @@ import com.elementa.wallet.domain.model.NetworkType
 import com.elementa.wallet.ui.navigation.Screen
 import com.elementa.wallet.ui.screens.*
 import com.elementa.wallet.ui.theme.WalletTheme
+import com.elementa.wallet.viewmodel.ChainDetailViewModel
 
 @Composable
 fun WalletAppRoot() {
@@ -28,10 +29,30 @@ fun WalletAppRoot() {
         }
     }
 
+    // Helper for main tab navigation to prevent backstack cycles
+    fun switchTab(screen: Screen) {
+        navController.navigate(screen.route) {
+            popUpTo(Screen.Home.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     WalletTheme {
         Surface {
             NavHost(navController = navController, startDestination = Screen.Welcome.route) {
                 
+                composable(Screen.Unlock.route) {
+                    UnlockScreen(
+                        viewModel = hiltViewModel(),
+                        onUnlocked = {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Unlock.route) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
                 composable(Screen.Welcome.route) {
                     WelcomeScreen(
                         onCreateWallet = { navigateTo(Screen.CreatePassword) },
@@ -88,13 +109,14 @@ fun WalletAppRoot() {
                 
                 composable(Screen.Home.route) {
                     HomeScreen(
-                        onOpenAssets = { navigateTo(Screen.Assets) },
+                        onOpenAssets = { switchTab(Screen.Assets) },
                         onSend = { navigateTo(Screen.Send) },
                         onReceive = { navigateTo(Screen.Receive) },
                         onSwap = { navigateTo(Screen.Swap) },
-                        onOpenActivity = { navigateTo(Screen.Activity) },
-                        onOpenSettings = { navigateTo(Screen.Settings) },
-                        onOpenEcosystem = { /* navigateTo(Screen.Ecosystem) */ },
+                        onOpenActivity = { switchTab(Screen.Activity) },
+                        onOpenSettings = { switchTab(Screen.Settings) },
+                        onOpenEcosystem = { switchTab(Screen.Ecosystem) },
+                        onBuy = { navigateTo(Screen.Buy) },
                         onChainDetailClicked = { chain, network ->
                             navController.navigate(Screen.ChainDetail(chain, network).route)
                         }
@@ -105,11 +127,13 @@ fun WalletAppRoot() {
                     val scannedAddress = entry.savedStateHandle.get<String>("scannedAddress") ?: ""
                     SendScreen(
                         onBack = { navController.popBackStack() },
-                        onDashboard = { navigateTo(Screen.Home) },
-                        onAssets = { navigateTo(Screen.Assets) },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
                         onTransfers = {},
                         onSwap = { navigateTo(Screen.Swap) },
-                        onActivity = { navigateTo(Screen.Activity) },
+                        onActivity = { switchTab(Screen.Activity) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onSettings = { switchTab(Screen.Settings) },
                         onContinue = { amount, recipient ->
                             navController.navigate(Screen.SendConfirm(amount, recipient).route)
                         },
@@ -149,14 +173,93 @@ fun WalletAppRoot() {
                     )
                 }
 
+                composable(Screen.Buy.route) {
+                    BuyScreen(
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onActivity = { switchTab(Screen.Activity) },
+                        onSettings = { switchTab(Screen.Settings) },
+                        onContinue = { amount, chain ->
+                            // In real app, proceed to payment
+                            navController.popBackStack()
+                        }
+                    )
+                }
+
+                composable(Screen.Swap.route) {
+                    SwapScreen(
+                        onBack = { navController.popBackStack() },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onTransfers = { navigateTo(Screen.Send) },
+                        onSwap = { /* already here */ },
+                        onActivity = { switchTab(Screen.Activity) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onSettings = { switchTab(Screen.Settings) }
+                    )
+                }
+
+                composable(Screen.Receive.route) {
+                    ReceiveScreen(
+                        onBack = { navController.popBackStack() },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onTransfers = { navigateTo(Screen.Send) },
+                        onSwap = { navigateTo(Screen.Swap) },
+                        onActivity = { switchTab(Screen.Activity) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onSettings = { switchTab(Screen.Settings) }
+                    )
+                }
+
                 composable(Screen.Assets.route) {
                     AssetsScreen(
                         onBack = { navController.popBackStack() },
-                        onDashboard = { navigateTo(Screen.Home) },
+                        onDashboard = { switchTab(Screen.Home) },
                         onAssets = { /* already here */ },
                         onTransfers = { navigateTo(Screen.Send) },
                         onSwap = { navigateTo(Screen.Swap) },
-                        onActivity = { navigateTo(Screen.Activity) }
+                        onActivity = { switchTab(Screen.Activity) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onSettings = { switchTab(Screen.Settings) },
+                        onAddToken = { navigateTo(Screen.AddToken) }
+                    )
+                }
+
+                composable(Screen.AddToken.route) {
+                    AddTokenScreen(
+                        viewModel = hiltViewModel(),
+                        onDone = { navController.popBackStack() }
+                    )
+                }
+
+                composable(Screen.Activity.route) {
+                    ActivityScreen(
+                        onBack = { navController.popBackStack() },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onTransfers = { navigateTo(Screen.Send) },
+                        onSwap = { navigateTo(Screen.Swap) },
+                        onActivity = { /* already here */ },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onSettings = { switchTab(Screen.Settings) }
+                    )
+                }
+
+                composable(Screen.Ecosystem.route) {
+                    ProtocolHubScreen(
+                        onBack = { navController.popBackStack() },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onActivity = { switchTab(Screen.Activity) },
+                        onSettings = { switchTab(Screen.Settings) },
+                        onMining = { navigateTo(Screen.EcosystemMining) },
+                        onMinting = { navigateTo(Screen.EcosystemMint) },
+                        onStaking = { navigateTo(Screen.EcosystemStake) },
+                        onGovernance = { navigateTo(Screen.EcosystemGovernance) },
+                        onAnalytics = { navigateTo(Screen.EcosystemAnalytics) },
+                        onMinerals = { navigateTo(Screen.EcosystemMinerals) }
                     )
                 }
 
@@ -164,11 +267,49 @@ fun WalletAppRoot() {
                     SettingsScreen(
                         viewModel = hiltViewModel(),
                         onBack = { navController.popBackStack() },
+                        onDashboard = { switchTab(Screen.Home) },
+                        onAssets = { switchTab(Screen.Assets) },
+                        onHub = { switchTab(Screen.Ecosystem) },
+                        onActivity = { switchTab(Screen.Activity) },
                         onSignOut = {
                             navController.navigate(Screen.Welcome.route) {
                                 popUpTo(Screen.Welcome.route) { inclusive = true }
                             }
+                        },
+                        onLock = {
+                            navController.navigate(Screen.Unlock.route) {
+                                popUpTo(Screen.Home.route) { inclusive = true }
+                            }
                         }
+                    )
+                }
+
+                composable(
+                    route = Screen.ChainDetail.ROUTE_TEMPLATE,
+                    arguments = listOf(
+                        navArgument(Screen.ChainDetail.ARG_CHAIN) { type = NavType.StringType },
+                        navArgument(Screen.ChainDetail.ARG_NETWORK) { type = NavType.StringType }
+                    )
+                ) { entry ->
+                    val chainStr = entry.arguments?.getString(Screen.ChainDetail.ARG_CHAIN) ?: ""
+                    val networkStr = entry.arguments?.getString(Screen.ChainDetail.ARG_NETWORK) ?: ""
+                    val chain = Chain.fromWire(chainStr)
+                    val network = NetworkType.fromWire(networkStr)
+                    
+                    // explicitly request the correct ViewModel type for Hilt
+                    val viewModel: ChainDetailViewModel = hiltViewModel<ChainDetailViewModel>()
+                    LaunchedEffect(chain, network) {
+                        viewModel.load(chain, network)
+                    }
+                    
+                    ChainDetailScreen(
+                        viewModel = viewModel,
+                        onAddToken = { navigateTo(Screen.AddToken) },
+                        onBack = { navController.popBackStack() },
+                        onSend = { navigateTo(Screen.Send) },
+                        onReceive = { navigateTo(Screen.Receive) },
+                        onQrScan = { navigateTo(Screen.QrScanner) },
+                        onActivity = { switchTab(Screen.Activity) }
                     )
                 }
             }
